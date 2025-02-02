@@ -32,7 +32,8 @@ func NewGoogleService() *GoogleService {
 }
 
 func (s *GoogleService) GetAuthURL() string {
-	return s.conf.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	url := s.conf.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	return url
 }
 
 func (s *GoogleService) GetToken(code string) (*oauth2.Token, error) {
@@ -44,12 +45,7 @@ func (s *GoogleService) GetToken(code string) (*oauth2.Token, error) {
 	return token, nil
 }
 
-func (s *GoogleService) GetUserInfo(code string) (*models.GoogleUserInfo, error) {
-	token, err := s.GetToken(code)
-	if err != nil {
-		return nil, fmt.Errorf("failed getting token: %v", err)
-	}
-
+func (s *GoogleService) GetUserInfo(token *oauth2.Token) (*models.GoogleUserInfo, error) {
 	client := s.conf.Client(context.Background(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
