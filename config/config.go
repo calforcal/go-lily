@@ -18,6 +18,8 @@ var (
 	GOOGLE_CLIENT_ID     string
 	GOOGLE_CLIENT_SECRET string
 	GOOGLE_REDIRECT_URL  string
+
+	JWT_SECRET string
 )
 
 func Init() {
@@ -36,6 +38,8 @@ func Init() {
 	GOOGLE_CLIENT_ID = getEnvOrDefault("GOOGLE_CLIENT_ID", "")
 	GOOGLE_CLIENT_SECRET = getEnvOrDefault("GOOGLE_CLIENT_SECRET", "")
 	GOOGLE_REDIRECT_URL = getEnvOrDefault("GOOGLE_REDIRECT_URL", "")
+
+	JWT_SECRET = getEnvOrDefault("JWT_SECRET", "")
 }
 
 func getEnvOrDefault(key, defaultValue string) string {
