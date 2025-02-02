@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/calforcal/can-lily-eat-it/services/google"
+	"github.com/calforcal/can-lily-eat-it/services/google/auth"
 	"github.com/calforcal/can-lily-eat-it/storage"
 	"github.com/labstack/echo/v4"
 )
@@ -39,6 +41,13 @@ type UserResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type TokenResponse struct {
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
+	Expiry       time.Time `json:"expiry"`
+	ExpiresIn    int       `json:"expires_in,omitempty"`
+}
+
 func (h *AuthHandler) Login(c echo.Context) error {
 	authURL := h.google.GetAuthURL()
 	return c.JSON(http.StatusOK, LoginResponse{URL: authURL})
@@ -50,21 +59,31 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{Message: "Code not found"})
 	}
 
-	userInfo, err := h.google.GetUserInfo(code)
+	// Get state parameter and validate it (TODO: implement state validation)
+	state := c.QueryParam("state")
+	if state == "" {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Message: "State parameter missing"})
+	}
+
+	token, err := h.google.GetToken(code)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, ErrorResponse{Message: err.Error()})
+		return c.JSON(http.StatusInternalServerError, ErrorResponse{Message: fmt.Sprintf("Failed to exchange code: %v", err)})
+	}
+
+	userInfo, err := h.google.GetUserInfo(token)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, ErrorResponse{Message: fmt.Sprintf("Failed to get user info: %v", err)})
 	}
 
 	user, err := h.storage.GetOrCreateUser(userInfo)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, ErrorResponse{Message: err.Error()})
+		return c.JSON(http.StatusInternalServerError, ErrorResponse{Message: fmt.Sprintf("Failed to process user: %v", err)})
 	}
 
-	return c.JSON(http.StatusOK, UserResponse{
-		UUID:      user.UUID,
-		Name:      user.Name,
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	})
+	tokenResponse, err := auth.IssueJwt(&user)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, ErrorResponse{Message: fmt.Sprintf("Failed to issue JWT: %v", err)})
+	}
+
+	return c.JSON(http.StatusOK, tokenResponse)
 }
